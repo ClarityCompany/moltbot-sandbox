@@ -307,6 +307,27 @@ adminApi.post('/gateway/restart', async (c) => {
   }
 });
 
+// POST /api/admin/telegram-test - Send a test message to Telegram
+adminApi.post('/telegram-test', async (c) => {
+  const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID } = c.env;
+
+  if (!TELEGRAM_BOT_TOKEN) return c.json({ error: 'TELEGRAM_BOT_TOKEN is not set' }, 400);
+  if (!TELEGRAM_CHAT_ID) return c.json({ error: 'TELEGRAM_CHAT_ID is not set' }, 400);
+
+  const resp = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text: '✅ Moltbot is connected to Telegram!',
+    }),
+  });
+
+  const body = await resp.json();
+  if (!resp.ok) return c.json({ error: 'Telegram API error', details: body }, 502);
+  return c.json({ success: true });
+});
+
 // Mount admin API routes under /admin
 api.route('/admin', adminApi);
 
