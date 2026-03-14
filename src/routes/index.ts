@@ -5,3 +5,4 @@ export { debug } from './debug';
 export { cdp } from './cdp';
 export { etsy } from './etsy';
 export { canva } from './canva';
+export { dam } from './dam';

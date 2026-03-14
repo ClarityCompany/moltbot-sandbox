@@ -27,7 +27,7 @@ import type { AppEnv, MoltbotEnv } from './types';
 import { MOLTBOT_PORT } from './config';
 import { createAccessMiddleware } from './auth';
 import { ensureMoltbotGateway, findExistingMoltbotProcess, syncToR2 } from './gateway';
-import { publicRoutes, api, adminUi, debug, cdp, etsy, canva } from './routes';
+import { publicRoutes, api, adminUi, debug, cdp, etsy, canva, dam } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import loadingPageHtml from './assets/loading.html';
 import configErrorHtml from './assets/config-error.html';
@@ -158,6 +158,11 @@ app.route('/etsy', etsy);
 // Mount Canva OAuth callback publicly (Canva redirects here — cannot go through CF Access)
 // All other /canva/* routes inside the handler require CF Access
 app.route('/canva', canva);
+
+// Canva DAM app backend — authenticated via Canva user JWT (not CF Access),
+// because the Canva App frontend runs inside canva.com and cannot pass CF Access cookies.
+// The sandbox middleware is still needed to read product data from the container.
+app.route('/dam', dam);
 
 // =============================================================================
 // PROTECTED ROUTES: Cloudflare Access authentication required

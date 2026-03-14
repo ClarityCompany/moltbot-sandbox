@@ -49,6 +49,8 @@ export interface MoltbotEnv {
   // Canva Connect API
   CANVA_CLIENT_ID?: string; // Canva app client ID
   CANVA_CLIENT_SECRET?: string; // Canva app client secret
+  // Canva Apps SDK (DAM app)
+  CANVA_APP_ID?: string; // App ID from canva.com/developers — used to verify Canva user JWTs
   // Etsy automation notifications
   TELEGRAM_CHAT_ID?: string; // Telegram chat ID to receive daily summaries
 }

@@ -109,6 +109,7 @@
   // - ETSY_SHOP_ID: Your Etsy shop ID (numeric)
   // - CANVA_CLIENT_ID: Canva integration client ID (canva.com/developers)
   // - CANVA_CLIENT_SECRET: Canva integration client secret
+  // - CANVA_APP_ID: Canva DAM App ID (canva.com/developers → DAM app → App ID)
   // - TELEGRAM_CHAT_ID: Telegram chat ID for daily summary notifications
   //   (TELEGRAM_BOT_TOKEN also required — listed under Chat channels above)
 }

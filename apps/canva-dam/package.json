@@ -1,0 +1,34 @@
+{
+  "name": "etsy-product-ideas-dam",
+  "description": "Canva DAM app showing AI-generated Etsy product concepts from the moltbot daily automation.",
+  "private": true,
+  "version": "0.1.0",
+  "dependencies": {
+    "@canva/app-components": "^2.1.0",
+    "@canva/app-i18n-kit": "latest",
+    "@canva/app-middleware": "^beta",
+    "@canva/app-ui-kit": "latest",
+    "@canva/asset": "latest",
+    "@canva/design": "latest",
+    "@canva/intents": "latest",
+    "@canva/platform": "latest",
+    "@canva/user": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.4",
+    "@types/react-dom": "^19.0.2",
+    "typescript": "^5.9.2"
+  },
+  "_setup_notes": [
+    "This app uses the Canva Apps SDK starter kit build system.",
+    "To develop/build, clone the starter kit and copy src/ into a new example:",
+    "  git clone https://github.com/canva-sdks/canva-apps-sdk-starter-kit.git",
+    "  cp -r apps/canva-dam/src canva-apps-sdk-starter-kit/examples/etsy_product_dam/",
+    "  cd canva-apps-sdk-starter-kit && npm install",
+    "  BACKEND_HOST=https://your-worker.workers.dev npm start etsy_product_dam",
+    "",
+    "Or use the setup.sh script in this directory which does the above automatically.",
+    "",
+    "CANVA_APP_ID must be set in the starter kit's .env file (get it from canva.com/developers)."
+  ]
+}
