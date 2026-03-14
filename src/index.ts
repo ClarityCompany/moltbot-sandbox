@@ -27,7 +27,7 @@ import type { AppEnv, MoltbotEnv } from './types';
 import { MOLTBOT_PORT } from './config';
 import { createAccessMiddleware } from './auth';
 import { ensureMoltbotGateway, findExistingMoltbotProcess, syncToR2 } from './gateway';
-import { publicRoutes, api, adminUi, debug, cdp } from './routes';
+import { publicRoutes, api, adminUi, debug, cdp, etsy } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import loadingPageHtml from './assets/loading.html';
 import configErrorHtml from './assets/config-error.html';
@@ -150,6 +150,10 @@ app.route('/', publicRoutes);
 
 // Mount CDP routes (uses shared secret auth via query param, not CF Access)
 app.route('/cdp', cdp);
+
+// Mount Etsy OAuth callback publicly (Etsy redirects here — cannot go through CF Access)
+// All other /etsy/* routes inside the handler require CF Access
+app.route('/etsy', etsy);
 
 // =============================================================================
 // PROTECTED ROUTES: Cloudflare Access authentication required
@@ -446,16 +450,42 @@ app.all('*', async (c) => {
 
 /**
  * Scheduled handler for cron triggers.
- * Syncs moltbot config/state from container to R2 for persistence.
+ *
+ * Dispatches based on cron schedule:
+ *   - every 5 min  → R2 backup sync
+ *   - 0 9 * * *    → Etsy daily automation workflow
  */
 async function scheduled(
-  _event: ScheduledEvent,
+  event: ScheduledEvent,
   env: MoltbotEnv,
   _ctx: ExecutionContext,
 ): Promise<void> {
   const options = buildSandboxOptions(env);
   const sandbox = getSandbox(env.Sandbox, 'moltbot', options);
 
+  // Daily Etsy automation (9 AM UTC)
+  if (event.cron === '0 9 * * *') {
+    console.log('[cron:etsy] Starting daily Etsy automation workflow...');
+    try {
+      const { buildEnvVars } = await import('./gateway/env');
+      const envVars = buildEnvVars(env);
+      const proc = await sandbox.startProcess(
+        'node /root/clawd/skills/etsy-automation/scripts/run-daily.js',
+        { env: envVars },
+      );
+      // Give the workflow up to 20 minutes to complete
+      const waitForProcess = (await import('./gateway/utils')).waitForProcess;
+      await waitForProcess(proc, 20 * 60 * 1000);
+      const logs = await proc.getLogs();
+      console.log('[cron:etsy] Workflow completed. stdout:', logs.stdout?.slice(-2000));
+      if (logs.stderr) console.error('[cron:etsy] stderr:', logs.stderr.slice(-1000));
+    } catch (err) {
+      console.error('[cron:etsy] Workflow failed:', err instanceof Error ? err.message : err);
+    }
+    return;
+  }
+
+  // Default: R2 backup sync (every 5 minutes)
   console.log('[cron] Starting backup sync to R2...');
   const result = await syncToR2(sandbox, env);
 

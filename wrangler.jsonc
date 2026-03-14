@@ -62,9 +62,11 @@
       "bucket_name": "moltbot-data","preview_bucket_name": "moltbot-data",
     },
   ],
-  // Cron trigger to sync moltbot data to R2 every 5 minutes
+  // Cron triggers:
+  //   */5 * * * *  - Sync moltbot data to R2 every 5 minutes
+  //   0 9 * * *    - Daily Etsy automation workflow (9 AM UTC)
   "triggers": {
-    "crons": ["*/5 * * * *"],
+    "crons": ["*/5 * * * *", "0 9 * * *"],
   },
   // Browser Rendering binding for CDP shim
   "browser": {
@@ -100,4 +102,13 @@
   // - R2_ACCESS_KEY_ID: R2 access key ID (from R2 API tokens)
   // - R2_SECRET_ACCESS_KEY: R2 secret access key (from R2 API tokens)
   // - CF_ACCOUNT_ID: Your Cloudflare account ID (for R2 endpoint URL)
+  //
+  // Etsy Automation (required for daily product workflow):
+  // - ETSY_API_KEY: Etsy developer app API key (etsy.com/developers)
+  // - ETSY_API_SECRET: Etsy developer app shared secret
+  // - ETSY_SHOP_ID: Your Etsy shop ID (numeric)
+  // - CANVA_CLIENT_ID: Canva integration client ID (canva.com/developers)
+  // - CANVA_CLIENT_SECRET: Canva integration client secret
+  // - TELEGRAM_CHAT_ID: Telegram chat ID for daily summary notifications
+  //   (TELEGRAM_BOT_TOKEN also required — listed under Chat channels above)
 }

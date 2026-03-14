@@ -1,0 +1,19 @@
+{
+  "productsPerDay": 3,
+  "autoPublish": false,
+  "defaultPriceUsd": 3.99,
+  "listingState": "draft",
+  "telegramEnabled": true,
+  "researchQueryLimit": 25,
+  "minFavoritesFilter": 10,
+  "canvaExportFormat": "PDF",
+  "listingImageFormat": "PNG",
+  "etsyTaxonomyId": 2078,
+  "workflowTimeoutMinutes": 20,
+  "scheduleCron": "0 9 * * *",
+  "notes": {
+    "autoPublish": "Set to true to publish listings immediately (default: create as drafts for review)",
+    "listingState": "draft or active",
+    "etsyTaxonomyId": "2078 = Art & Collectibles > Digital Prints. See https://www.etsy.com/developers/documentation/reference/taxonomy"
+  }
+}
