@@ -479,7 +479,7 @@ async function scheduled(
       const { buildEnvVars } = await import('./gateway/env');
       const envVars = buildEnvVars(env);
       const proc = await sandbox.startProcess(
-        'node /root/clawd/skills/etsy-automation/scripts/run-daily.js',
+        'node /root/clawd/skills/etsy-automation/scripts/run-daily.js --skip-listing --skip-metrics',
         { env: envVars },
       );
       // Give the workflow up to 20 minutes to complete

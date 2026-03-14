@@ -70,6 +70,7 @@ async function main() {
   const date      = parseDateArg();
   const skipDesign  = parseFlag('--skip-design');
   const skipListing = parseFlag('--skip-listing');
+  const skipMetrics = parseFlag('--skip-metrics');
   const skipNotify  = parseFlag('--skip-notify');
 
   const startedAt = new Date().toISOString();
@@ -136,14 +137,19 @@ async function main() {
   }
 
   // ── Step 5: Metrics ───────────────────────────────────────────────────────
-  const metricsResult = await runStep('Metrics (shop performance)', () =>
-    step('metrics-tracker').runMetricsTracker(),
-  );
-  log.steps.metrics = { status: metricsResult.status, error: metricsResult.error };
+  if (!skipMetrics) {
+    const metricsResult = await runStep('Metrics (shop performance)', () =>
+      step('metrics-tracker').runMetricsTracker(),
+    );
+    log.steps.metrics = { status: metricsResult.status, error: metricsResult.error };
 
-  if (metricsResult.status === 'success') {
-    log.sales_today = metricsResult.result?.total_sales ?? 0;
-    log.revenue_today = metricsResult.result?.revenue_usd ?? 0;
+    if (metricsResult.status === 'success') {
+      log.sales_today = metricsResult.result?.total_sales ?? 0;
+      log.revenue_today = metricsResult.result?.revenue_usd ?? 0;
+    }
+  } else {
+    console.log('[run-daily] Skipping metrics step (--skip-metrics)');
+    log.steps.metrics = { status: 'skipped' };
   }
 
   // ── Step 6: Notify ────────────────────────────────────────────────────────
