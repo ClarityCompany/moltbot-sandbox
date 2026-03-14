@@ -6,19 +6,23 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "dependencies": {
+    "puppeteer-core": "^22.0.0"
+  },
   "scripts": {
     "research":  "node scripts/etsy-research.js --print",
     "analyze":   "node scripts/product-analyzer.js",
-    "design":    "node scripts/canva-designer.js",
+    "design":    "node scripts/svg-designer.js",
     "list":      "node scripts/etsy-lister.js",
     "metrics":   "node scripts/metrics-tracker.js",
     "notify":    "node scripts/telegram-notifier.js",
     "run-daily": "node scripts/run-daily.js",
-    "list-designs": "node scripts/canva-designer.js --list-designs"
+    "install-deps": "npm install"
   },
   "notes": {
-    "dependencies": "All scripts use Node.js built-in fetch() (Node 18+) and the fs/path standard library. No npm packages are required to run the automation.",
-    "canva": "The Canva Connect API is a REST API — no npm package needed. Authenticate via OAuth 2.0 at https://<your-worker>/canva/auth after deploying.",
+    "puppeteer-core": "Used by svg-designer.js to render SVG → PNG/PDF via the system Chrome/Chromium. Run `npm install` before first use.",
+    "chrome": "svg-designer.js requires Chrome or Chromium. The sandbox container has it at /usr/bin/google-chrome or /usr/bin/chromium-browser. Install if missing: apt-get install -y chromium-browser",
+    "canva": "canva-designer.js (Canva Connect API) is no longer used by default. svg-designer.js generates designs directly via Claude. canva-designer.js is still available for manual use.",
     "etsy":  "The Etsy API v3 is a REST API — no npm package needed. Authenticate via OAuth 2.0 at https://<your-worker>/etsy/auth after deploying.",
     "claude": "Uses the Anthropic REST API directly via fetch(). Requires ANTHROPIC_API_KEY environment variable."
   }

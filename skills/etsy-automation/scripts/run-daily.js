@@ -105,10 +105,10 @@ async function main() {
     );
     log.steps.analyze = { status: analyzeResult.status, error: analyzeResult.error };
 
-    // ── Step 3: Design (Canva) ────────────────────────────────────────────────
+    // ── Step 3: Design (Claude SVG generator) ────────────────────────────────
     if (!skipDesign) {
-      const designResult = await runStep('Design (Canva Connect API)', () =>
-        step('canva-designer').runDesigner(date),
+      const designResult = await runStep('Design (Claude SVG generator)', () =>
+        step('svg-designer').runDesigner(date),
       );
       log.steps.design = { status: designResult.status, error: designResult.error };
     } else {
