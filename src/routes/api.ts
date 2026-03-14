@@ -328,6 +328,28 @@ adminApi.post('/telegram-test', async (c) => {
   return c.json({ success: true });
 });
 
+// POST /api/admin/run-automation - Manually trigger the daily Etsy automation
+adminApi.post('/run-automation', async (c) => {
+  const sandbox = c.get('sandbox');
+  const { buildEnvVars } = await import('../gateway/env');
+  const envVars = buildEnvVars(c.env);
+
+  try {
+    const proc = await sandbox.startProcess(
+      'node /root/clawd/skills/etsy-automation/scripts/run-daily.js --skip-listing --skip-metrics',
+      { env: envVars },
+    );
+
+    // Run in background — don't wait for completion
+    c.executionCtx.waitUntil(proc.getLogs());
+
+    return c.json({ success: true, message: 'Automation started — check Telegram in ~2 minutes' });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.json({ error: errorMessage }, 500);
+  }
+});
+
 // Mount admin API routes under /admin
 api.route('/admin', adminApi);
 
