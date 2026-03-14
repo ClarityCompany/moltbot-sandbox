@@ -27,7 +27,7 @@ import type { AppEnv, MoltbotEnv } from './types';
 import { MOLTBOT_PORT } from './config';
 import { createAccessMiddleware } from './auth';
 import { ensureMoltbotGateway, findExistingMoltbotProcess, syncToR2 } from './gateway';
-import { publicRoutes, api, adminUi, debug, cdp, etsy } from './routes';
+import { publicRoutes, api, adminUi, debug, cdp, etsy, canva } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import loadingPageHtml from './assets/loading.html';
 import configErrorHtml from './assets/config-error.html';
@@ -154,6 +154,10 @@ app.route('/cdp', cdp);
 // Mount Etsy OAuth callback publicly (Etsy redirects here — cannot go through CF Access)
 // All other /etsy/* routes inside the handler require CF Access
 app.route('/etsy', etsy);
+
+// Mount Canva OAuth callback publicly (Canva redirects here — cannot go through CF Access)
+// All other /canva/* routes inside the handler require CF Access
+app.route('/canva', canva);
 
 // =============================================================================
 // PROTECTED ROUTES: Cloudflare Access authentication required

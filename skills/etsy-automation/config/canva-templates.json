@@ -1,0 +1,44 @@
+{
+  "_instructions": [
+    "Add your Canva template design IDs here.",
+    "How to find a design ID: open the design in Canva, copy from the URL:",
+    "  https://www.canva.com/design/DAGxxxxxxxx/edit",
+    "                                  ^^^^^^^^^^^^ ← this is the design_id",
+    "",
+    "Create one template per product category. The automation will export each",
+    "template as a PDF (the digital download file) and PNG (listing image).",
+    "",
+    "Run this to list all designs in your Canva account:",
+    "  node /root/clawd/skills/etsy-automation/scripts/canva-designer.js --list-designs"
+  ],
+  "templates": [
+    {
+      "label": "Printable Wall Art",
+      "category": "Printable Wall Art",
+      "keywords": ["wall art", "printable", "poster", "print"],
+      "design_id": "REPLACE_WITH_YOUR_CANVA_DESIGN_ID",
+      "default": false
+    },
+    {
+      "label": "SVG Cut Files",
+      "category": "SVG Cut Files",
+      "keywords": ["svg", "cut file", "cricut", "silhouette"],
+      "design_id": "REPLACE_WITH_YOUR_CANVA_DESIGN_ID",
+      "default": false
+    },
+    {
+      "label": "Digital Planner",
+      "category": "Digital Planner",
+      "keywords": ["planner", "journal", "goodnotes", "pdf"],
+      "design_id": "REPLACE_WITH_YOUR_CANVA_DESIGN_ID",
+      "default": false
+    },
+    {
+      "label": "Canva Template",
+      "category": "Canva Template",
+      "keywords": ["template", "social media", "canva"],
+      "design_id": "REPLACE_WITH_YOUR_CANVA_DESIGN_ID",
+      "default": true
+    }
+  ]
+}

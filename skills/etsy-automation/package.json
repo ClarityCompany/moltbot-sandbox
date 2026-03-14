@@ -1,0 +1,25 @@
+{
+  "name": "etsy-automation",
+  "version": "1.0.0",
+  "description": "Daily Etsy digital product automation skill",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "research":  "node scripts/etsy-research.js --print",
+    "analyze":   "node scripts/product-analyzer.js",
+    "design":    "node scripts/canva-designer.js",
+    "list":      "node scripts/etsy-lister.js",
+    "metrics":   "node scripts/metrics-tracker.js",
+    "notify":    "node scripts/telegram-notifier.js",
+    "run-daily": "node scripts/run-daily.js",
+    "list-designs": "node scripts/canva-designer.js --list-designs"
+  },
+  "notes": {
+    "dependencies": "All scripts use Node.js built-in fetch() (Node 18+) and the fs/path standard library. No npm packages are required to run the automation.",
+    "canva": "The Canva Connect API is a REST API — no npm package needed. Authenticate via OAuth 2.0 at https://<your-worker>/canva/auth after deploying.",
+    "etsy":  "The Etsy API v3 is a REST API — no npm package needed. Authenticate via OAuth 2.0 at https://<your-worker>/etsy/auth after deploying.",
+    "claude": "Uses the Anthropic REST API directly via fetch(). Requires ANTHROPIC_API_KEY environment variable."
+  }
+}
