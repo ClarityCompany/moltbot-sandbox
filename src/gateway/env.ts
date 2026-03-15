@@ -59,6 +59,10 @@ export function buildEnvVars(env: MoltbotEnv): Record<string, string> {
   // Telegram notifications
   if (env.TELEGRAM_BOT_TOKEN) envVars.TELEGRAM_BOT_TOKEN = env.TELEGRAM_BOT_TOKEN;
   if (env.TELEGRAM_CHAT_ID) envVars.TELEGRAM_CHAT_ID = env.TELEGRAM_CHAT_ID;
+  // Google Sheets automation
+  if (env.GOOGLE_SERVICE_ACCOUNT_KEY) envVars.GOOGLE_SERVICE_ACCOUNT_KEY = env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  if (env.GOOGLE_SHEET_ID) envVars.GOOGLE_SHEET_ID = env.GOOGLE_SHEET_ID;
+  if (env.GOOGLE_SHEET_NAME) envVars.GOOGLE_SHEET_NAME = env.GOOGLE_SHEET_NAME;
 
   return envVars;
 }

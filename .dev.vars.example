@@ -40,3 +40,9 @@ MOLTBOT_GATEWAY_TOKEN=dev-token-change-in-prod
 # CDP (Chrome DevTools Protocol) configuration for browser automation
 # CDP_SECRET=shared-secret-for-cdp-auth
 # WORKER_URL=https://your-worker.example.com
+
+# Google Sheets integration (for daily product row writing)
+# Service account needs Editor access to the sheet + Drive API enabled
+# GOOGLE_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"...","private_key":"-----BEGIN RSA PRIVATE KEY-----\n...","client_email":"bot@project.iam.gserviceaccount.com",...}
+# GOOGLE_SHEET_ID=1S52Ld2pXjJxKFzqDH90XJYXu7L2BzyyGbHi8L0uGulI
+# GOOGLE_SHEET_NAME=Sheet1

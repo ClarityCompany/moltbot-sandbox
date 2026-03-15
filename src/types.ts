@@ -54,6 +54,10 @@ export interface MoltbotEnv {
   CANVA_APP_ID?: string; // App ID from canva.com/developers — used to verify Canva user JWTs
   // Etsy automation notifications
   TELEGRAM_CHAT_ID?: string; // Telegram chat ID to receive daily summaries
+  // Google Sheets automation
+  GOOGLE_SERVICE_ACCOUNT_KEY?: string; // JSON string of Google service account key file
+  GOOGLE_SHEET_ID?: string;            // Google Sheet ID to write product rows
+  GOOGLE_SHEET_NAME?: string;          // Sheet tab name (default: Sheet1)
 }
 
 /**
