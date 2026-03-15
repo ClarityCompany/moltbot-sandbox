@@ -27,13 +27,22 @@ const RESEARCH_DIR = path.join(DATA_DIR, 'research');
 // ─── Claude API with web_search ───────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are an expert Etsy market research analyst. Your job is to discover
-what digital download products are CURRENTLY bestselling on Etsy by searching the internet.
+what digital download products are CURRENTLY bestselling on Etsy by searching the internet —
+including Etsy itself, TikTok trends, Instagram aesthetics, Pinterest boards, and design blogs.
 
 You will search for:
 - Actual Etsy listings with high favorite counts and strong sales
+- TikTok videos tagged #EtsySeller, #DigitalDownload, #PrintableArt showing viral products
+- Instagram hashtags like #EtsyShop #DigitalPrint #PrintableWallArt for trending aesthetics
+- Pinterest boards featuring digital printables, planners, and SVG projects
 - Blog posts and YouTube videos about top-selling Etsy digital products
 - Reddit discussions (r/Etsy, r/EtsySellers, r/DigitalDownloads) about what sells
-- Current design trend reports relevant to Etsy digital products
+- Current design trend reports (Pantone colors, typography trends, aesthetic movements)
+
+Pay particular attention to cross-platform signals:
+- A product style that is trending on TikTok AND appearing on Etsy = high opportunity
+- Pinterest boards with thousands of saves for a design style = strong demand signal
+- Instagram reels showing a digital product going viral = immediate opportunity
 
 Focus exclusively on DIGITAL DOWNLOAD products (not physical items):
 - Printable wall art and decor
@@ -63,7 +72,7 @@ The JSON must follow this exact structure:
       "tags": ["tag1", "tag2", "tag3"],
       "description": "Why this product sells: what makes it popular, its audience, its value",
       "source": "web_research",
-      "trend_signal": "What data point or source indicates this is popular"
+      "trend_signal": "Platform/source that indicates this is popular (e.g. 'TikTok viral', 'Pinterest 50k saves', 'Etsy bestseller badge')"
     }
   ]
 }
@@ -75,23 +84,31 @@ in multiple bestseller lists).`;
 
 const RESEARCH_PROMPT = `Today is ${new Date().toISOString().slice(0, 10)}.
 
-Research what digital download products are currently bestselling on Etsy. Please search for:
+Research what digital download products are currently trending and bestselling. Search ACROSS platforms:
 
+ETSY:
 1. "best selling etsy digital downloads ${new Date().getFullYear()}"
-2. "most popular etsy printables" or "top etsy digital products"
-3. Specific high-traffic Etsy categories: wall art printables, SVG files, digital planners, Canva templates
-4. "etsy digital downloads trending" or similar to find current hot products
-5. Any Reddit posts from r/Etsy or r/EtsySellers about what's selling well
-6. Look at actual Etsy search results for "digital download" sorted by "top reviews"
+2. "most popular etsy printables top sellers"
+3. Specific categories: wall art printables, SVG cut files, digital planners, Canva templates, wedding invitations
 
-For each product you find that has strong sales evidence, include it in your final JSON.
-Pay attention to:
-- Products with many favorites (hearts) or reviews
-- Products mentioned repeatedly across different sources
-- Items that appear in "bestseller" or "top picks" sections
-- Current seasonal trends (what's hot right now in ${new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })})
+TIKTOK:
+4. TikTok #EtsySeller #DigitalDownload #PrintableArt trending products
+5. "tiktok etsy digital products viral" or "etsy made me buy it digital"
+6. Any TikTok design trends (aesthetics, color palettes, styles) that translate to printable products
 
-Output the JSON object when you have enough data (aim for 25+ listings).`;
+INSTAGRAM + PINTEREST:
+7. Instagram #digitaldownload #etsyprintable trending posts and reels
+8. Pinterest "best selling digital products etsy" or "printable wall art ideas"
+9. Pinterest boards for "digital planner", "printable home decor", "svg files cricut"
+
+DESIGN TRENDS:
+10. Current design trends ${new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })}: popular aesthetics, color palettes, typography
+11. Any seasonal or cultural moments driving demand right now
+
+For each product you find, note WHERE you found the signal (TikTok, Pinterest, Etsy, Reddit, etc.)
+and use that as the trend_signal field.
+
+Output the JSON object when you have enough data (aim for 25+ listings spanning multiple platforms).`;
 
 // ─── Agentic loop ─────────────────────────────────────────────────────────────
 
