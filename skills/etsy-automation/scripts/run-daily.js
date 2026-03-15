@@ -30,7 +30,7 @@
 const fs   = require('fs');
 const path = require('path');
 
-const DATA_DIR = process.env.ETSY_DATA_DIR || '/root/clawd/etsy-automation';
+const DATA_DIR = process.env.ETSY_DATA_DIR || path.join(__dirname, '..', 'data');
 const SKILLS_DIR = path.dirname(__dirname); // /root/clawd/skills/etsy-automation
 
 // Lazily require each step module
