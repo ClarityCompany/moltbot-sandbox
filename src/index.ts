@@ -26,7 +26,12 @@ import { getSandbox, Sandbox, type SandboxOptions } from '@cloudflare/sandbox';
 import type { AppEnv, MoltbotEnv } from './types';
 import { MOLTBOT_PORT } from './config';
 import { createAccessMiddleware } from './auth';
-import { ensureMoltbotGateway, findExistingMoltbotProcess, syncToR2 } from './gateway';
+import {
+  ensureMoltbotGateway,
+  findExistingMoltbotProcess,
+  syncToR2,
+  autoApprovePendingDevices,
+} from './gateway';
 import { publicRoutes, api, adminUi, debug, cdp, etsy, canva, dam } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import loadingPageHtml from './assets/loading.html';
@@ -422,6 +427,21 @@ app.all('*', async (c) => {
       if (debugLogs) {
         console.log('[WS] Transformed close reason:', reason);
       }
+
+      // When the gateway rejects a device due to missing pairing, automatically approve
+      // it so the client's next reconnect attempt goes through without admin intervention.
+      // This is safe: the request already passed Cloudflare Access auth to reach here.
+      if (event.reason?.includes('pairing required')) {
+        console.log('[WS] Pairing required — triggering background auto-approve');
+        c.executionCtx.waitUntil(
+          autoApprovePendingDevices(sandbox, c.env.MOLTBOT_GATEWAY_TOKEN).then((result) => {
+            console.log(
+              `[auto-approve] ${result.approved.length} device(s) approved after ${result.attempts} poll(s)`,
+            );
+          }),
+        );
+      }
+
       serverWs.close(event.code, reason);
     });
 
