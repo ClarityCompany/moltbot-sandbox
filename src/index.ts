@@ -412,6 +412,10 @@ app.all('*', async (c) => {
       }
       // Transform the close reason (truncate to 123 bytes max for WebSocket spec)
       let reason = transformErrorMessage(event.reason, url.host);
+      // Provide a helpful fallback when code 1008 has no reason (gateway signals reconnect)
+      if (event.code === 1008 && !reason) {
+        reason = 'Session reset — please reconnect or refresh the page';
+      }
       if (reason.length > 123) {
         reason = reason.slice(0, 120) + '...';
       }
