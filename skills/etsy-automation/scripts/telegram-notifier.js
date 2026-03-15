@@ -2,24 +2,16 @@
 /**
  * Telegram Notifier
  *
- * Sends two daily messages via Telegram:
- *
- *   Message 1 — Products Created
- *     • How many products were created today
- *     • Link to each listing (or "draft — review in Etsy Studio")
- *
- *   Message 2 — Sales Summary
- *     • How many products sold today
- *     • Today's revenue
- *     • Top seller (if any)
+ * Sends a daily summary message with the products that were created today
+ * and uploaded to Google Sheets (ready for Make to post to Etsy).
  *
  * Requires:
  *   TELEGRAM_BOT_TOKEN  — your Telegram bot token
  *   TELEGRAM_CHAT_ID    — your personal chat ID (get it from @userinfobot)
  *
  * Usage:
- *   node telegram-notifier.js --date=2025-06-01   (send summary for a date)
- *   node telegram-notifier.js                     (today)
+ *   node telegram-notifier.js
+ *   node telegram-notifier.js --date=2025-06-01
  */
 
 'use strict';
@@ -28,13 +20,11 @@ const fs   = require('fs');
 const path = require('path');
 
 const DATA_DIR     = process.env.ETSY_DATA_DIR || path.join(__dirname, '..', 'data');
-const LISTINGS_DIR = path.join(DATA_DIR, 'listings');
-const METRICS_DIR  = path.join(DATA_DIR, 'metrics');
+const PRODUCTS_DIR = path.join(DATA_DIR, 'products');
+const DESIGNS_DIR  = path.join(DATA_DIR, 'designs');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
-
-// ─── Telegram API helper ──────────────────────────────────────────────────────
 
 async function sendTelegramMessage(text, parseMode = 'HTML') {
   if (!BOT_TOKEN) throw new Error('TELEGRAM_BOT_TOKEN is not set');
@@ -47,7 +37,7 @@ async function sendTelegramMessage(text, parseMode = 'HTML') {
       chat_id:    CHAT_ID,
       text,
       parse_mode: parseMode,
-      disable_web_page_preview: false,
+      disable_web_page_preview: true,
     }),
   });
 
@@ -59,146 +49,70 @@ async function sendTelegramMessage(text, parseMode = 'HTML') {
   return resp.json();
 }
 
-// ─── Build message content ────────────────────────────────────────────────────
-
-function buildProductsMessage(date, listings) {
-  const successful = listings.filter((l) => l.status === 'success');
-  const failed     = listings.filter((l) => l.status !== 'success');
-
-  if (successful.length === 0) {
-    return `📦 <b>Etsy Daily Report — ${date}</b>\n\n` +
-           `No new products were created today.\n` +
-           (failed.length > 0 ? `❌ ${failed.length} failed — check logs.` : '');
-  }
-
-  const lines = [
-    `📦 <b>Etsy Daily Report — ${date}</b>`,
-    ``,
-    `✅ <b>${successful.length} new product${successful.length > 1 ? 's' : ''} created!</b>`,
-    ``,
-  ];
-
-  successful.forEach((l, i) => {
-    const stateIcon = l.state === 'active' ? '🟢' : '📝';
-    const stateLabel = l.state === 'active' ? 'Live' : 'Draft';
-    lines.push(`${i + 1}. ${stateIcon} <b>${l.title || `Product ${l.product_id}`}</b>`);
-    if (l.price_usd) lines.push(`   💲 $${l.price_usd}`);
-    if (l.listing_url) {
-      lines.push(`   <a href="${l.listing_url}">View on Etsy (${stateLabel})</a>`);
-    }
-    lines.push('');
-  });
-
-  if (failed.length > 0) {
-    lines.push(`❌ ${failed.length} product${failed.length > 1 ? 's' : ''} failed — check logs.`);
-  }
-
-  return lines.join('\n');
-}
-
-function buildSalesMessage(date, metricsSnapshot) {
-  if (!metricsSnapshot) {
-    return `📊 <b>Sales Summary — ${date}</b>\n\nNo metrics data available.`;
-  }
-
-  const { total_sales, revenue_usd, listings } = metricsSnapshot;
-
-  const lines = [
-    `📊 <b>Sales Summary — ${date}</b>`,
-    ``,
-    `💰 Sales today: <b>${total_sales}</b>`,
-    `💵 Revenue:     <b>$${revenue_usd}</b>`,
-    ``,
-  ];
-
-  if (total_sales > 0 && listings) {
-    const topSellers = (listings || [])
-      .filter((l) => (l.sales_today || 0) > 0)
-      .sort((a, b) => (b.sales_today || 0) - (a.sales_today || 0))
-      .slice(0, 3);
-
-    if (topSellers.length > 0) {
-      lines.push(`🏆 <b>Top sellers:</b>`);
-      topSellers.forEach((l) => {
-        lines.push(`  • ${l.title.slice(0, 50)} — ${l.sales_today} sale${l.sales_today > 1 ? 's' : ''} ($${l.revenue_today})`);
-      });
-      lines.push('');
-    }
-  }
-
-  const allTimeFavorites = (listings || [])
-    .sort((a, b) => (b.favorites || 0) - (a.favorites || 0))
-    .slice(0, 1);
-  if (allTimeFavorites.length > 0 && allTimeFavorites[0].favorites > 0) {
-    lines.push(`❤️ Most favorited: <b>${allTimeFavorites[0].title.slice(0, 50)}</b> (${allTimeFavorites[0].favorites} saves)`);
-  }
-
-  return lines.join('\n');
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
 async function runNotifier(date) {
   date = date || new Date().toISOString().slice(0, 10);
-  console.log(`[telegram] Sending daily notifications for ${date}...`);
+  console.log(`[telegram] Sending daily notification for ${date}...`);
 
-  // Load listings data
-  let listings = [];
-  const listingsFile = path.join(LISTINGS_DIR, `${date}.json`);
-  if (fs.existsSync(listingsFile)) {
-    const data = JSON.parse(fs.readFileSync(listingsFile, 'utf8'));
-    listings = data.listings || [];
+  // Load today's products
+  let products = [];
+  const productsFile = path.join(PRODUCTS_DIR, `${date}.json`);
+  if (fs.existsSync(productsFile)) {
+    const data = JSON.parse(fs.readFileSync(productsFile, 'utf8'));
+    products = data.products || [];
   }
 
-  // Load metrics data
-  let metricsSnapshot = null;
-  const metricsFile = path.join(METRICS_DIR, `${date}.json`);
-  if (fs.existsSync(metricsFile)) {
-    metricsSnapshot = JSON.parse(fs.readFileSync(metricsFile, 'utf8'));
+  // Check design results to know which products have mockups ready
+  let designResults = [];
+  const designsFile = path.join(DESIGNS_DIR, date, 'design-results.json');
+  if (fs.existsSync(designsFile)) {
+    const data = JSON.parse(fs.readFileSync(designsFile, 'utf8'));
+    designResults = data.results || [];
   }
 
-  const errors = [];
+  const lines = [
+    `🛍️ <b>Etsy Automation — ${date}</b>`,
+    '',
+  ];
 
-  // Send products message
+  if (products.length === 0) {
+    lines.push('No products were created today.');
+  } else {
+    lines.push(`✅ <b>${products.length} product${products.length > 1 ? 's' : ''} ready for Etsy</b>`);
+    lines.push('');
+
+    products.forEach((p, i) => {
+      const design = designResults.find((d) => d.product_id === p.id && d.status === 'success');
+      const mockupCount = design?.mockup_paths?.length || 0;
+      const hasDesign   = !!design?.png_path;
+
+      lines.push(`${i + 1}. <b>${p.title || `Product ${p.id}`}</b>`);
+      lines.push(`   💲 $${p.price_usd}  |  🏷 ${(p.tags || []).slice(0, 3).join(', ')}`);
+      lines.push(`   🎨 Design: ${hasDesign ? '✅' : '❌'}  |  📸 Mockups: ${mockupCount}/4`);
+      lines.push('');
+    });
+
+    lines.push('📊 Rows written to Google Sheet — Make will create the Etsy listings shortly.');
+  }
+
+  const message = lines.join('\n');
+
   try {
-    const msg = buildProductsMessage(date, listings);
-    await sendTelegramMessage(msg);
-    console.log('[telegram] Products message sent ✅');
+    await sendTelegramMessage(message);
+    console.log('[telegram] Message sent ✅');
   } catch (err) {
-    console.error('[telegram] Failed to send products message:', err.message);
-    errors.push(err.message);
+    console.error('[telegram] Failed to send message:', err.message);
+    return { date, errors: [err.message] };
   }
 
-  // Small delay between messages
-  await new Promise((r) => setTimeout(r, 2000));
-
-  // Send sales message
-  try {
-    const msg = buildSalesMessage(date, metricsSnapshot);
-    await sendTelegramMessage(msg);
-    console.log('[telegram] Sales message sent ✅');
-  } catch (err) {
-    console.error('[telegram] Failed to send sales message:', err.message);
-    errors.push(err.message);
-  }
-
-  return { date, errors };
+  return { date, errors: [] };
 }
-
-// ─── CLI entry point ──────────────────────────────────────────────────────────
 
 if (require.main === module) {
   const dateArg = process.argv.find((a) => a.startsWith('--date='));
   const date    = dateArg ? dateArg.split('=')[1] : undefined;
 
   runNotifier(date)
-    .then((result) => {
-      if (result.errors.length > 0) {
-        console.error('Errors:', result.errors);
-        process.exit(1);
-      }
-      process.exit(0);
-    })
+    .then((result) => process.exit(result.errors.length > 0 ? 1 : 0))
     .catch((err) => {
       console.error('[telegram] Fatal error:', err.message);
       process.exit(1);

@@ -156,8 +156,7 @@ app.route('/', publicRoutes);
 // Mount CDP routes (uses shared secret auth via query param, not CF Access)
 app.route('/cdp', cdp);
 
-// Mount Etsy OAuth callback publicly (Etsy redirects here — cannot go through CF Access)
-// All other /etsy/* routes inside the handler require CF Access
+// Mount Etsy automation routes (status + manual trigger, CF Access required)
 app.route('/etsy', etsy);
 
 // Mount Canva OAuth callback publicly (Canva redirects here — cannot go through CF Access)
@@ -503,7 +502,7 @@ async function scheduled(
       const { buildEnvVars } = await import('./gateway/env');
       const envVars = buildEnvVars(env);
       const proc = await sandbox.startProcess(
-        'node /root/clawd/skills/etsy-automation/scripts/run-daily.js --skip-listing --skip-metrics',
+        'node /root/clawd/skills/etsy-automation/scripts/run-daily.js',
         { env: envVars },
       );
       // Give the workflow up to 20 minutes to complete

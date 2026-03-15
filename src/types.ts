@@ -42,11 +42,6 @@ export interface MoltbotEnv {
   BROWSER?: Fetcher;
   CDP_SECRET?: string; // Shared secret for CDP endpoint authentication
   WORKER_URL?: string; // Public URL of the worker (for CDP endpoint)
-  // Etsy automation
-  ETSY_API_KEY?: string; // Etsy developer API key
-  ETSY_API_SECRET?: string; // Etsy API secret (for OAuth)
-  ETSY_SHOP_ID?: string; // Your Etsy shop ID
-  ZAPIER_WEBHOOK_SECRET?: string; // Shared secret for Zapier → /etsy/webhook/zapier
   // Canva Connect API
   CANVA_CLIENT_ID?: string; // Canva app client ID
   CANVA_CLIENT_SECRET?: string; // Canva app client secret

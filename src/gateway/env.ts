@@ -49,15 +49,10 @@ export function buildEnvVars(env: MoltbotEnv): Record<string, string> {
   if (env.CF_ACCOUNT_ID) envVars.CF_ACCOUNT_ID = env.CF_ACCOUNT_ID;
   if (env.CDP_SECRET) envVars.CDP_SECRET = env.CDP_SECRET;
   if (env.WORKER_URL) envVars.WORKER_URL = env.WORKER_URL;
-  // Etsy automation
-  if (env.ETSY_API_KEY) envVars.ETSY_API_KEY = env.ETSY_API_KEY;
-  if (env.ETSY_API_SECRET) envVars.ETSY_API_SECRET = env.ETSY_API_SECRET;
-  if (env.ETSY_SHOP_ID) envVars.ETSY_SHOP_ID = env.ETSY_SHOP_ID;
   // Canva Connect API
   if (env.CANVA_CLIENT_ID) envVars.CANVA_CLIENT_ID = env.CANVA_CLIENT_ID;
   if (env.CANVA_CLIENT_SECRET) envVars.CANVA_CLIENT_SECRET = env.CANVA_CLIENT_SECRET;
   // Telegram notifications
-  if (env.TELEGRAM_BOT_TOKEN) envVars.TELEGRAM_BOT_TOKEN = env.TELEGRAM_BOT_TOKEN;
   if (env.TELEGRAM_CHAT_ID) envVars.TELEGRAM_CHAT_ID = env.TELEGRAM_CHAT_ID;
   // Google Sheets automation
   if (env.GOOGLE_SERVICE_ACCOUNT_KEY) envVars.GOOGLE_SERVICE_ACCOUNT_KEY = env.GOOGLE_SERVICE_ACCOUNT_KEY;

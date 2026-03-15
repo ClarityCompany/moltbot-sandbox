@@ -336,7 +336,7 @@ adminApi.post('/run-automation', async (c) => {
 
   try {
     const proc = await sandbox.startProcess(
-      'node /root/clawd/skills/etsy-automation/scripts/run-daily.js --skip-listing --skip-metrics',
+      'node /root/clawd/skills/etsy-automation/scripts/run-daily.js',
       { env: envVars },
     );
 
