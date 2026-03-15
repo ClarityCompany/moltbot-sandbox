@@ -374,7 +374,7 @@ etsyProtected.post('/trigger', async (c) => {
   try {
     const envVars = buildEnvVars(c.env);
     const proc = await sandbox.startProcess(
-      'node /root/clawd/skills/etsy-automation/scripts/run-daily.js',
+      'node /root/clawd/skills/etsy-automation/scripts/run-daily.js --skip-listing --skip-metrics',
       { env: envVars },
     );
 
