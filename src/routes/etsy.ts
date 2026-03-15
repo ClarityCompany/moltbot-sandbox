@@ -27,19 +27,21 @@ etsy.get('/status', async (c) => {
   let lastRunStatus: string | null = null;
   let lastRunSteps: Record<string, string> = {};
 
+  let rawJson = '';
   try {
     const proc = await sandbox.startProcess(
-      'cat /root/clawd/etsy-automation/data/last-run.json 2>/dev/null || echo ""',
+      'cat /root/clawd/skills/etsy-automation/data/last-run.json 2>/dev/null || echo ""',
     );
     await waitForProcess(proc, 5000);
     const logs = await proc.getLogs();
     const raw = logs.stdout?.trim();
+    rawJson = raw || '';
     if (raw) {
       const run = JSON.parse(raw) as {
         timestamp?: string;
         started_at?: string;
         status?: string;
-        steps?: Record<string, { status: string }>;
+        steps?: Record<string, { status: string; error?: string }>;
       };
       lastRun = run.started_at ?? run.timestamp ?? null;
       lastRunStatus = run.status ?? null;
@@ -53,12 +55,27 @@ etsy.get('/status', async (c) => {
     // ignore
   }
 
-  const stepsHtml = Object.entries(lastRunSteps)
-    .map(([step, status]) => {
+  // Parse full step details (including error messages) for display
+  let stepDetails: Array<{ step: string; status: string; error?: string }> = [];
+  if (rawJson) {
+    try {
+      const run = JSON.parse(rawJson) as { steps?: Record<string, { status: string; error?: string }> };
+      if (run.steps) {
+        stepDetails = Object.entries(run.steps).map(([step, v]) => ({
+          step,
+          status: v.status,
+          error: v.error,
+        }));
+      }
+    } catch { /* ignore */ }
+  }
+
+  const stepsHtml = stepDetails
+    .map(({ step, status, error }) => {
       const icon = status === 'success' ? '✅' : status === 'skipped' ? '⏭️' : status === 'failed' ? '❌' : '—';
       return `<tr>
-        <td style="padding:6px 12px;border:1px solid #ddd">${step}</td>
-        <td style="padding:6px 12px;border:1px solid #ddd">${icon} ${status}</td>
+        <td style="padding:6px 12px;border:1px solid #ddd;vertical-align:top">${step}</td>
+        <td style="padding:6px 12px;border:1px solid #ddd;vertical-align:top">${icon} ${status}${error ? `<br><small style="color:#c00">${error}</small>` : ''}</td>
       </tr>`;
     })
     .join('');
@@ -66,7 +83,7 @@ etsy.get('/status', async (c) => {
   return c.html(`
     <html>
       <head><title>Etsy Automation Status</title></head>
-      <body style="font-family:sans-serif;max-width:700px;margin:2rem auto;padding:1rem">
+      <body style="font-family:sans-serif;max-width:800px;margin:2rem auto;padding:1rem">
         <h2>Etsy Automation Status</h2>
         <table style="border-collapse:collapse;width:100%;margin-bottom:1.5rem">
           <tr>
@@ -88,6 +105,12 @@ etsy.get('/status', async (c) => {
         <table style="border-collapse:collapse;width:100%;margin-bottom:1.5rem">
           ${stepsHtml}
         </table>` : ''}
+
+        ${rawJson ? `
+        <details style="margin-bottom:1.5rem">
+          <summary style="cursor:pointer;font-weight:bold">Raw last-run.json</summary>
+          <pre style="background:#f5f5f5;padding:1rem;overflow:auto;font-size:0.8rem;margin-top:0.5rem">${rawJson.replace(/</g, '&lt;')}</pre>
+        </details>` : ''}
 
         <form method="POST" action="/etsy/trigger">
           <button type="submit" style="background:#333;color:#fff;padding:10px 20px;border:none;border-radius:4px;cursor:pointer">
