@@ -170,6 +170,98 @@ etsy.get('/callback', async (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// PUBLIC ROUTE: Zapier webhook — create a single Etsy listing
+// Secured by ZAPIER_WEBHOOK_SECRET rather than Cloudflare Access.
+// ---------------------------------------------------------------------------
+//
+// Expected JSON body (from Zapier "Webhooks by Zapier" action):
+//   {
+//     "title":       "My Wall Art Print",          // required
+//     "description": "A beautiful digital print",  // required
+//     "price":       4.99,                          // required (USD)
+//     "tags":        "wall art, printable, boho",  // optional, comma-separated
+//     "image_url":   "https://...",                 // optional
+//     "quantity":    999,                           // optional, default 999
+//     "auto_publish": false                         // optional, default false (creates draft)
+//   }
+//
+// Responds with:
+//   { listing_id, listing_url, title, state }  on success
+//   { error }                                  on failure
+//
+// Set up in Zapier:
+//   Trigger: Google Sheets → New Spreadsheet Row
+//   Action:  Webhooks by Zapier → POST
+//     URL:     https://<your-worker>.workers.dev/etsy/webhook/zapier
+//     Headers: X-Zapier-Secret: <ZAPIER_WEBHOOK_SECRET value>
+//     Data:    (map sheet columns to the JSON fields above)
+// ---------------------------------------------------------------------------
+
+etsy.post('/webhook/zapier', async (c) => {
+  const secret = c.env.ZAPIER_WEBHOOK_SECRET;
+
+  // Require a secret to be configured
+  if (!secret) {
+    return c.json({ error: 'Webhook is not configured (ZAPIER_WEBHOOK_SECRET not set)' }, 503);
+  }
+
+  // Validate the caller's secret
+  const provided = c.req.header('x-zapier-secret') ?? '';
+  if (provided !== secret) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json<Record<string, unknown>>();
+  } catch {
+    return c.json({ error: 'Request body must be valid JSON' }, 400);
+  }
+
+  if (!body.title || !body.description || !body.price) {
+    return c.json({ error: 'title, description, and price are required' }, 400);
+  }
+
+  const sandbox = c.get('sandbox');
+
+  // Escape the payload for safe shell embedding
+  const listingJson = JSON.stringify(body).replace(/'/g, "'\\''");
+
+  let proc: Awaited<ReturnType<typeof sandbox.startProcess>>;
+  try {
+    proc = await sandbox.startProcess(
+      `node /root/clawd/skills/etsy-automation/scripts/zapier-lister.js --listing='${listingJson}'`,
+      { env: { ETSY_API_KEY: c.env.ETSY_API_KEY ?? '', ETSY_SHOP_ID: c.env.ETSY_SHOP_ID ?? '' } },
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to start process';
+    return c.json({ error: msg }, 500);
+  }
+
+  try {
+    await waitForProcess(proc, 30_000);
+  } catch {
+    // timeout or non-zero exit — read output anyway
+  }
+
+  const logs = await proc.getLogs();
+  const stdout = logs.stdout?.trim() ?? '';
+
+  let result: Record<string, unknown>;
+  try {
+    result = JSON.parse(stdout);
+  } catch {
+    return c.json({ error: `Script output was not valid JSON: ${stdout.slice(0, 300)}` }, 500);
+  }
+
+  if (result.error) {
+    return c.json({ error: result.error }, 500);
+  }
+
+  return c.json(result, 201);
+});
+
+// ---------------------------------------------------------------------------
 // PROTECTED ROUTES (Cloudflare Access required)
 // ---------------------------------------------------------------------------
 
