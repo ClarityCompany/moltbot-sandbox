@@ -49,7 +49,7 @@ async function callClaude(messages, systemPrompt, maxTokens = 8192) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model:      'claude-sonnet-4-5',
+      model:      'claude-sonnet-4-6',
       max_tokens: maxTokens,
       system:     systemPrompt,
       messages,
@@ -330,7 +330,7 @@ async function designProduct(product, outDir) {
   // ── 4. Save design metadata ───────────────────────────────────────────────
   const meta = {
     product_id:        product.id,
-    designed_by:       'claude-sonnet-4-5',
+    designed_by:       'claude-sonnet-4-6',
     svg_path:          svgPath,
     png_path:          pngRendered ? pngPath : null,
     pdf_path:          pdfRendered ? pdfPath : null,

@@ -6,7 +6,7 @@
  * Drive and appends a row to the configured Google Sheet with all product details.
  *
  * Sheet columns (must match your sheet headers):
- *   title | description | price | tag1..tag8 | Image
+ *   title | description | price | tag1..tag8 | image1..image4 | download_file
  *
  * Required environment variables:
  *   GOOGLE_SERVICE_ACCOUNT_KEY  — JSON string of a Google Service Account key file
@@ -91,11 +91,18 @@ async function getGoogleAccessToken() {
 
 // ─── Google Drive: upload image ───────────────────────────────────────────────
 
-async function uploadToDrive(token, imagePath, fileName) {
+function mimeTypeForFile(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.pdf') return 'application/pdf';
+  if (ext === '.svg') return 'image/svg+xml';
+  return 'image/png';
+}
+
+async function uploadToDrive(token, filePath, fileName) {
   console.log(`  [sheets-writer] Uploading ${fileName} to Google Drive...`);
 
-  const imageBuffer = fs.readFileSync(imagePath);
-  const mimeType    = 'image/png';
+  const imageBuffer = fs.readFileSync(filePath);
+  const mimeType    = mimeTypeForFile(filePath);
 
   // Multipart upload: metadata + image body
   const boundary = '-------moltbot314159265';
@@ -160,7 +167,7 @@ async function uploadToDrive(token, imagePath, fileName) {
 // ─── Google Sheets: append row ────────────────────────────────────────────────
 
 async function appendSheetRow(token, rowData) {
-  const range = encodeURIComponent(`${SHEET_NAME}!A:O`);
+  const range = encodeURIComponent(`${SHEET_NAME}!A:P`);
   const url   = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
   const resp = await fetch(url, {
@@ -235,17 +242,39 @@ async function runGoogleSheetsWriter(date) {
         console.log(`  [sheets-writer] No images found for product ${product.id} — image cells will be empty`);
       }
 
+      // Upload the actual product download file (PDF for most categories, SVG for cut files)
+      // Prefer PDF, fall back to SVG, then PNG as last resort
+      let downloadFileUrl = '';
+      const productFilePath =
+        (design?.pdf_path && fs.existsSync(design.pdf_path) ? design.pdf_path : null) ||
+        (design?.svg_path && fs.existsSync(design.svg_path) ? design.svg_path : null) ||
+        (design?.png_path && fs.existsSync(design.png_path) ? design.png_path : null);
+
+      if (productFilePath) {
+        const ext      = path.extname(productFilePath).slice(1).toUpperCase(); // PDF / SVG / PNG
+        const fileName = `etsy-product-${date}-${product.id}-download.${ext.toLowerCase()}`;
+        try {
+          downloadFileUrl = await uploadToDrive(token, productFilePath, fileName);
+          console.log(`  [sheets-writer] ✅ Product file (${ext}) uploaded: ${downloadFileUrl}`);
+        } catch (err) {
+          console.warn(`  [sheets-writer] ⚠️  Product file upload failed: ${err.message}`);
+        }
+      } else {
+        console.log(`  [sheets-writer] No product file found for product ${product.id}`);
+      }
+
       // Map tags to 8 columns, pad with empty strings if fewer than 8
       const tags = (product.tags || []).slice(0, 8);
       while (tags.length < 8) tags.push('');
 
-      // Row: title, description, price, tag1..tag8, image1, image2, image3, image4
+      // Row: title, description, price, tag1..tag8, image1..image4, download_file
       const row = [
         product.title       || '',
         product.description || '',
         product.price_usd   || '',
         ...tags,
         ...imageUrls,
+        downloadFileUrl,
       ];
 
       await appendSheetRow(token, row);
