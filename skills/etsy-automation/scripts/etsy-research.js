@@ -2,13 +2,12 @@
 /**
  * Etsy Research Module
  *
- * Discovers the top-selling digital products on Etsy each day.
+ * Uses Claude Sonnet 4.6 with the web_search tool to research current
+ * best-selling digital products on Etsy. Claude visits search results,
+ * Etsy listing pages, trend blogs, and Reddit discussions to build a
+ * comprehensive picture of what is selling well right now.
  *
- * Strategy (two-pass):
- *   1. Etsy API — query active digital listings with sort_on=top_listings across
- *      several high-value taxonomy/keyword combinations.
- *   2. Browser scraping (CDP fallback) — if the API returns sparse results, scrape
- *      Etsy's public search page to supplement with visual/ranking signals.
+ * No Etsy API key required.
  *
  * Output: writes /root/clawd/etsy-automation/research/YYYY-MM-DD.json
  *
@@ -21,185 +20,239 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { etsyPublicFetch } = require('./etsy-auth');
 
-const DATA_DIR      = process.env.ETSY_DATA_DIR || path.join(__dirname, '..', 'data');
-const RESEARCH_DIR  = path.join(DATA_DIR, 'research');
+const DATA_DIR     = process.env.ETSY_DATA_DIR || path.join(__dirname, '..', 'data');
+const RESEARCH_DIR = path.join(DATA_DIR, 'research');
 
-// ─── Configuration ────────────────────────────────────────────────────────────
+// ─── Claude API with web_search ───────────────────────────────────────────────
 
-// Product categories to research (Etsy taxonomy IDs for digital goods)
-// https://www.etsy.com/developers/documentation/getting_started/taxonomy
-const RESEARCH_QUERIES = [
-  { label: 'Printable Wall Art',   keywords: 'printable wall art digital download' },
-  { label: 'SVG Cut Files',        keywords: 'svg cut file cricut silhouette digital' },
-  { label: 'Digital Planner',      keywords: 'digital planner pdf goodnotes' },
-  { label: 'Canva Template',       keywords: 'canva template editable social media' },
-  { label: 'Budget Spreadsheet',   keywords: 'budget spreadsheet excel google sheets template' },
-  { label: 'Printable Planner',    keywords: 'printable planner pages inserts pdf' },
-  { label: 'Clipart Bundle',       keywords: 'clipart bundle digital illustration' },
-  { label: 'Resume Template',      keywords: 'resume template word canva instant download' },
-];
+const SYSTEM_PROMPT = `You are an expert Etsy market research analyst. Your job is to discover
+what digital download products are CURRENTLY bestselling on Etsy by searching the internet.
 
-const LISTINGS_PER_QUERY = 25; // Etsy API max 100, we cap at 25 per query
-const MIN_FAVORITES = 10;       // Filter out listings with very few saves
+You will search for:
+- Actual Etsy listings with high favorite counts and strong sales
+- Blog posts and YouTube videos about top-selling Etsy digital products
+- Reddit discussions (r/Etsy, r/EtsySellers, r/DigitalDownloads) about what sells
+- Current design trend reports relevant to Etsy digital products
 
-// ─── Etsy API research ────────────────────────────────────────────────────────
+Focus exclusively on DIGITAL DOWNLOAD products (not physical items):
+- Printable wall art and decor
+- SVG cut files (Cricut/Silhouette)
+- Digital planners (Goodnotes, Notability, PDF)
+- Canva templates (social media, business, wedding)
+- Printable planners, trackers, and organizers
+- Wedding and party invitation templates
+- Resume and CV templates
+- Clipart and illustration bundles
+- Spreadsheet templates (budgets, trackers)
+- Digital stickers and journals
 
-async function fetchTopListingsForQuery(query) {
-  console.log(`  [research] Querying Etsy API: "${query.keywords}"`);
+After your research, output a single JSON object — NO markdown fences, NO extra text.
+The JSON must follow this exact structure:
 
-  try {
-    const params = new URLSearchParams({
-      keywords:           query.keywords,
-      limit:              String(LISTINGS_PER_QUERY),
-      sort_on:            'score',       // relevancy + popularity signals
-      listing_type:       'download',    // digital downloads only
-      includes:           'images,tags',
-      fields:             'listing_id,title,description,price,tags,views,num_favorers,url,images,taxonomy_path,created_timestamp',
+{
+  "date": "YYYY-MM-DD",
+  "analysis_summary": "2-3 sentences summarising the key trends you observed today",
+  "listings": [
+    {
+      "title": "Exact or representative product title from Etsy",
+      "category": "Human-readable category (e.g. Printable Wall Art)",
+      "price_usd": 3.99,
+      "favorites": 5000,
+      "views": 25000,
+      "tags": ["tag1", "tag2", "tag3"],
+      "description": "Why this product sells: what makes it popular, its audience, its value",
+      "source": "web_research",
+      "trend_signal": "What data point or source indicates this is popular"
+    }
+  ]
+}
+
+Include AT LEAST 25 listings across at least 6 different categories.
+Estimate favorites/views based on any evidence you find (badge counts, review counts, seller stats).
+If you cannot find exact numbers, use conservative estimates (e.g. 500 favorites if the listing appears
+in multiple bestseller lists).`;
+
+const RESEARCH_PROMPT = `Today is ${new Date().toISOString().slice(0, 10)}.
+
+Research what digital download products are currently bestselling on Etsy. Please search for:
+
+1. "best selling etsy digital downloads ${new Date().getFullYear()}"
+2. "most popular etsy printables" or "top etsy digital products"
+3. Specific high-traffic Etsy categories: wall art printables, SVG files, digital planners, Canva templates
+4. "etsy digital downloads trending" or similar to find current hot products
+5. Any Reddit posts from r/Etsy or r/EtsySellers about what's selling well
+6. Look at actual Etsy search results for "digital download" sorted by "top reviews"
+
+For each product you find that has strong sales evidence, include it in your final JSON.
+Pay attention to:
+- Products with many favorites (hearts) or reviews
+- Products mentioned repeatedly across different sources
+- Items that appear in "bestseller" or "top picks" sections
+- Current seasonal trends (what's hot right now in ${new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })})
+
+Output the JSON object when you have enough data (aim for 25+ listings).`;
+
+// ─── Agentic loop ─────────────────────────────────────────────────────────────
+
+async function runClaudeResearch() {
+  const apiKey  = process.env.ANTHROPIC_API_KEY;
+  const baseUrl = (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '');
+
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
+
+  console.log('[etsy-research] Starting Claude-powered web research...');
+
+  const messages = [{ role: 'user', content: RESEARCH_PROMPT }];
+  let finalText  = '';
+  const MAX_TURNS = 20; // safety limit on agentic iterations
+
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
+    console.log(`  [etsy-research] API call ${turn + 1}/${MAX_TURNS}...`);
+
+    // eslint-disable-next-line no-await-in-loop
+    const resp = await fetch(`${baseUrl}/v1/messages`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':    'application/json',
+        'x-api-key':       apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta':  'web-search-2025-03-05',
+      },
+      body: JSON.stringify({
+        model:      'claude-sonnet-4-6',
+        max_tokens: 8192,
+        system:     SYSTEM_PROMPT,
+        tools:      [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages,
+      }),
     });
 
-    const data = await etsyPublicFetch(`/v3/application/listings/active?${params}`);
-    const listings = (data.results || []).filter(
-      (l) => (l.num_favorers || 0) >= MIN_FAVORITES,
-    );
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`Claude API error ${resp.status}: ${errText}`);
+    }
 
-    return listings.map((l) => ({
-      listing_id:    l.listing_id,
-      title:         l.title,
-      description:   (l.description || '').slice(0, 500),
-      price_usd:     l.price?.amount ? l.price.amount / l.price.divisor : null,
-      currency:      l.price?.currency_code || 'USD',
-      tags:          l.tags || [],
-      views:         l.views || 0,
-      favorites:     l.num_favorers || 0,
-      url:           l.url,
-      thumbnail_url: l.images?.[0]?.url_570xN || null,
-      taxonomy_path: l.taxonomy_path || [],
-      created:       l.created_timestamp,
-      source:        'etsy_api',
-      category:      query.label,
-    }));
-  } catch (err) {
-    console.warn(`  [research] API query failed for "${query.keywords}": ${err.message}`);
-    return [];
+    // eslint-disable-next-line no-await-in-loop
+    const data = await resp.json();
+
+    // Append the assistant's full turn (may include tool_use + tool_result blocks)
+    messages.push({ role: 'assistant', content: data.content });
+
+    if (data.stop_reason === 'end_turn') {
+      // Claude finished — extract the final text block
+      const textBlock = data.content.find((b) => b.type === 'text');
+      if (textBlock?.text) {
+        finalText = textBlock.text;
+        console.log(`  [etsy-research] Research complete after ${turn + 1} turn(s).`);
+      }
+      break;
+    }
+
+    if (data.stop_reason === 'tool_use') {
+      // web_search_20250305 is server-side: Anthropic executes the searches.
+      // We provide tool_result shells to continue the conversation; the API
+      // fills in the actual search results on the next call.
+      const toolResults = data.content
+        .filter((b) => b.type === 'tool_use')
+        .map((b) => ({
+          type:        'tool_result',
+          tool_use_id: b.id,
+          content:     '',
+        }));
+
+      if (toolResults.length > 0) {
+        const queries = data.content
+          .filter((b) => b.type === 'tool_use' && b.name === 'web_search')
+          .map((b) => b.input?.query || '(search)')
+          .join(', ');
+        console.log(`  [etsy-research] Claude is searching: ${queries}`);
+        messages.push({ role: 'user', content: toolResults });
+      }
+    }
   }
+
+  if (!finalText) {
+    throw new Error('Claude did not produce a final text response after research');
+  }
+
+  return finalText;
 }
 
-// ─── Browser-based scraping (fallback / supplemental) ────────────────────────
+// ─── Parse Claude's JSON output ───────────────────────────────────────────────
 
-async function scrapeEtsySearch(keywords) {
-  // Only attempt if CDP is configured
-  if (!process.env.CDP_SECRET || !process.env.WORKER_URL) {
-    return [];
-  }
+function parseResearchOutput(rawText, date) {
+  // Strip markdown fences if Claude included them despite instructions
+  const cleaned = rawText
+    .replace(/^```(?:json)?\s*/m, '')
+    .replace(/\s*```$/m, '')
+    .trim();
 
-  console.log(`  [research] Scraping Etsy search page for: "${keywords}"`);
-  let client;
+  let parsed;
   try {
-    const { createClient } = require('../../cloudflare-browser/scripts/cdp-client');
-    client = await createClient();
-
-    await client.setViewport(1280, 900);
-
-    const searchUrl = `https://www.etsy.com/search?q=${encodeURIComponent(keywords)}&listing_type=digital&order=top_seller`;
-    await client.navigate(searchUrl, 5000);
-
-    // Extract listing cards from the search results page
-    const result = await client.evaluate(`
-      (() => {
-        const cards = Array.from(document.querySelectorAll('[data-listing-id]')).slice(0, 20);
-        return cards.map(card => {
-          const titleEl   = card.querySelector('[data-listing-id] h3, .wt-text-caption, .v2-listing-card__info h3');
-          const priceEl   = card.querySelector('[data-price], .currency-value');
-          const linkEl    = card.querySelector('a[href*="/listing/"]');
-          const imgEl     = card.querySelector('img');
-          const favEl     = card.querySelector('[data-favoriting]');
-          return {
-            title:         titleEl?.textContent?.trim() || '',
-            price_text:    priceEl?.textContent?.trim() || '',
-            url:           linkEl?.href || '',
-            thumbnail_url: imgEl?.src || '',
-            listing_id:    card.getAttribute('data-listing-id') || '',
-          };
-        }).filter(c => c.listing_id && c.title);
-      })()
-    `);
-
-    const items = result?.result?.value;
-    if (!Array.isArray(items)) return [];
-
-    return items.map((item) => ({
-      ...item,
-      source:   'browser_scrape',
-      category: keywords,
-      tags:     [],
-      views:    0,
-      favorites: 0,
-    }));
+    parsed = JSON.parse(cleaned);
   } catch (err) {
-    console.warn(`  [research] Browser scrape failed: ${err.message}`);
-    return [];
-  } finally {
-    client?.close();
+    // Try to extract a JSON block from the text
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch {
+        throw new Error(`Failed to parse Claude's research output as JSON: ${err.message}`);
+      }
+    } else {
+      throw new Error(`No JSON found in Claude's response: ${err.message}`);
+    }
   }
+
+  // Normalise the output to match the expected schema
+  const listings = (parsed.listings || []).map((l, i) => ({
+    listing_id:    `web-${date}-${i + 1}`,
+    title:         l.title         || '',
+    description:   l.description   || '',
+    price_usd:     Number(l.price_usd) || null,
+    currency:      'USD',
+    tags:          Array.isArray(l.tags) ? l.tags : [],
+    views:         Number(l.views)     || 0,
+    favorites:     Number(l.favorites) || 0,
+    url:           l.url            || '',
+    thumbnail_url: l.thumbnail_url  || null,
+    taxonomy_path: [],
+    source:        'web_research',
+    category:      l.category       || 'Digital Download',
+    trend_signal:  l.trend_signal   || '',
+  }));
+
+  // Sort by estimated popularity
+  listings.sort((a, b) => (b.favorites || 0) - (a.favorites || 0));
+
+  return {
+    date,
+    started_at:       new Date().toISOString(),
+    ended_at:         new Date().toISOString(),
+    total:            listings.length,
+    categories:       [...new Set(listings.map((l) => l.category))],
+    analysis_summary: parsed.analysis_summary || '',
+    listings,
+  };
 }
 
-// ─── Main research function ───────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function runResearch() {
-  console.log('[etsy-research] Starting daily research...');
-  const startedAt = new Date().toISOString();
+  const date = new Date().toISOString().slice(0, 10);
+  console.log(`[etsy-research] Running web research for ${date}...`);
 
   fs.mkdirSync(RESEARCH_DIR, { recursive: true });
 
-  const allListings = [];
-  const seenIds     = new Set();
+  const rawText = await runClaudeResearch();
+  const report  = parseResearchOutput(rawText, date);
 
-  for (const query of RESEARCH_QUERIES) {
-    // eslint-disable-next-line no-await-in-loop
-    const listings = await fetchTopListingsForQuery(query);
-    for (const l of listings) {
-      if (!seenIds.has(l.listing_id)) {
-        seenIds.add(l.listing_id);
-        allListings.push(l);
-      }
-    }
-
-    // Polite rate limiting: 10 req/s Etsy limit
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise((r) => setTimeout(r, 150));
-  }
-
-  // Supplement with browser scraping for "top seller" signal
-  if (allListings.length < 10) {
-    for (const query of RESEARCH_QUERIES.slice(0, 3)) {
-      // eslint-disable-next-line no-await-in-loop
-      const scraped = await scrapeEtsySearch(query.keywords);
-      for (const l of scraped) {
-        if (!seenIds.has(l.listing_id) && l.listing_id) {
-          seenIds.add(l.listing_id);
-          allListings.push(l);
-        }
-      }
-    }
-  }
-
-  // Sort by favorites desc (strongest popularity signal available)
-  allListings.sort((a, b) => (b.favorites || 0) - (a.favorites || 0));
-
-  const report = {
-    date:       new Date().toISOString().slice(0, 10),
-    started_at: startedAt,
-    ended_at:   new Date().toISOString(),
-    total:      allListings.length,
-    categories: RESEARCH_QUERIES.map((q) => q.label),
-    listings:   allListings,
-  };
-
-  const outFile = path.join(RESEARCH_DIR, `${report.date}.json`);
+  const outFile = path.join(RESEARCH_DIR, `${date}.json`);
   fs.writeFileSync(outFile, JSON.stringify(report, null, 2));
-  console.log(`[etsy-research] Done. ${allListings.length} listings saved to ${outFile}`);
+
+  console.log(`[etsy-research] Done. ${report.total} listings saved to ${outFile}`);
+  console.log(`[etsy-research] Summary: ${report.analysis_summary}`);
 
   return report;
 }
@@ -210,10 +263,10 @@ if (require.main === module) {
   runResearch()
     .then((report) => {
       if (process.argv.includes('--print')) {
-        console.log('\nTop 10 by favorites:');
+        console.log('\nTop 10 by estimated favorites:');
         report.listings.slice(0, 10).forEach((l, i) => {
           console.log(
-            `  ${i + 1}. [${l.category}] ${l.title.slice(0, 60)} | ❤️ ${l.favorites} | $${l.price_usd}`,
+            `  ${i + 1}. [${l.category}] ${l.title.slice(0, 60)} | ❤️ ~${l.favorites} | $${l.price_usd}`,
           );
         });
       }
