@@ -145,7 +145,17 @@ export interface RunAutomationResponse {
 }
 
 export async function runAutomation(): Promise<RunAutomationResponse> {
-  return apiRequest<RunAutomationResponse>('/run-automation', {
+  const response = await fetch('/etsy/trigger', {
     method: 'POST',
+    credentials: 'include',
   });
+  if (response.status === 401) {
+    throw new AuthError('Unauthorized - please log in via Cloudflare Access');
+  }
+  // /etsy/trigger returns HTML, so just treat any 2xx as success
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Trigger failed (${response.status}): ${text.slice(0, 200)}`);
+  }
+  return { success: true, message: 'Automation started — check Telegram in ~2 minutes' };
 }
