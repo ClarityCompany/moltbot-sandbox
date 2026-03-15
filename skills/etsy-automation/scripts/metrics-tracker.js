@@ -28,7 +28,7 @@ const fs   = require('fs');
 const path = require('path');
 const { etsyFetch } = require('./etsy-auth');
 
-const DATA_DIR    = process.env.ETSY_DATA_DIR || '/root/clawd/etsy-automation';
+const DATA_DIR    = process.env.ETSY_DATA_DIR || path.join(__dirname, '..', 'data');
 const METRICS_DIR = path.join(DATA_DIR, 'metrics');
 const SHOP_ID     = process.env.ETSY_SHOP_ID;
 

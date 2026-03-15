@@ -16,7 +16,7 @@
 const fs   = require('fs');
 const path = require('path');
 
-const DATA_DIR    = process.env.ETSY_DATA_DIR || '/root/clawd/etsy-automation';
+const DATA_DIR    = process.env.ETSY_DATA_DIR || path.join(__dirname, '..', 'data');
 const TOKEN_FILE  = path.join(DATA_DIR, 'etsy-tokens.json');
 const ETSY_API    = 'https://openapi.etsy.com';
 const TOKEN_URL   = 'https://api.etsy.com/v3/public/oauth/token';

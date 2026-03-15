@@ -27,7 +27,7 @@
 const fs   = require('fs');
 const path = require('path');
 
-const DATA_DIR     = process.env.ETSY_DATA_DIR || '/root/clawd/etsy-automation';
+const DATA_DIR     = process.env.ETSY_DATA_DIR || path.join(__dirname, '..', 'data');
 const LISTINGS_DIR = path.join(DATA_DIR, 'listings');
 const METRICS_DIR  = path.join(DATA_DIR, 'metrics');
 
