@@ -17,7 +17,7 @@ import { buildEnvVars } from '../gateway/env';
 import { waitForProcess } from '../gateway/utils';
 
 const etsy = new Hono<AppEnv>();
-etsy.use('*', createAccessMiddleware({ type: 'html' }));
+etsy.use('*', createAccessMiddleware({ type: 'html', redirectOnMissing: true }));
 
 // GET /etsy/status — Last run info
 etsy.get('/status', async (c) => {

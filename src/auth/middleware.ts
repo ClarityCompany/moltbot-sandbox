@@ -89,7 +89,14 @@ export function createAccessMiddleware(options: AccessMiddlewareOptions) {
 
     if (!jwt) {
       if (type === 'html' && redirectOnMissing) {
-        return c.redirect(`https://${teamDomain}`, 302);
+        const requestUrl = new URL(c.req.url);
+        const hostname = requestUrl.hostname;
+        const teamDomainClean = teamDomain.replace(/^https?:\/\//, '');
+        const redirectUri = encodeURIComponent(c.req.url);
+        return c.redirect(
+          `https://${teamDomainClean}/cdn-cgi/access/login/${hostname}?redirect_uri=${redirectUri}`,
+          302,
+        );
       }
 
       if (type === 'json') {
