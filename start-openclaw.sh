@@ -285,6 +285,47 @@ console.log('Configuration patched successfully');
 EOFPATCH
 
 # ============================================================
+# AUTO-APPROVE DAEMON
+# ============================================================
+# Runs in the background and auto-approves any pending device-pairing requests
+# every 5 seconds.  All connections already passed Cloudflare Access auth, so
+# device pairing is redundant — this makes it invisible to the user.
+cat > /tmp/auto-approve-daemon.js << 'EOFJS'
+'use strict';
+const { execSync } = require('child_process');
+const token   = process.env.OPENCLAW_GATEWAY_TOKEN;
+const tokenArg = token ? `--token ${token}` : '';
+const url     = 'ws://localhost:18789';
+
+function approveAll() {
+  try {
+    const out = execSync(
+      `openclaw devices list --json --url ${url} ${tokenArg}`,
+      { timeout: 10_000 },
+    ).toString();
+    const m = out.match(/\{[\s\S]*\}/);
+    if (!m) return;
+    const data = JSON.parse(m[0]);
+    for (const device of (data.pending || [])) {
+      try {
+        execSync(
+          `openclaw devices approve ${device.requestId} --url ${url} ${tokenArg}`,
+          { timeout: 10_000 },
+        );
+        console.log('[auto-approve] Approved device:', device.requestId);
+      } catch (_) { /* ignore per-device errors */ }
+    }
+  } catch (_) { /* gateway not ready yet — will retry */ }
+}
+
+setInterval(approveAll, 5_000);
+console.log('[auto-approve] Daemon running (polling every 5 s)');
+EOFJS
+
+node /tmp/auto-approve-daemon.js &
+echo "Auto-approve daemon started (PID: $!)"
+
+# ============================================================
 # START GATEWAY
 # ============================================================
 echo "Starting OpenClaw Gateway..."

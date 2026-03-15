@@ -430,7 +430,11 @@ app.all('*', async (c) => {
       // When the gateway rejects a device due to missing pairing, automatically approve
       // it so the client's next reconnect attempt goes through without admin intervention.
       // This is safe: the request already passed Cloudflare Access auth to reach here.
-      if (event.reason?.includes('pairing required')) {
+      // Also catch code 1008 with empty reason — the gateway sometimes omits the text.
+      const isPairingRejection =
+        event.reason?.toLowerCase().includes('pair') ||
+        (event.code === 1008 && !event.reason);
+      if (isPairingRejection) {
         console.log('[WS] Pairing required — triggering background auto-approve');
         c.executionCtx.waitUntil(
           autoApprovePendingDevices(sandbox, c.env.MOLTBOT_GATEWAY_TOKEN).then((result) => {
