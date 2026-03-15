@@ -18,6 +18,7 @@
  * Usage:
  *   node run-daily.js                      (run today's full workflow)
  *   node run-daily.js --skip-design        (skip Canva step — use existing designs)
+ *   node run-daily.js --skip-mockups       (skip DALL-E 3 mockup generation)
  *   node run-daily.js --skip-sheets        (skip Google Sheets step)
  *   node run-daily.js --skip-listing       (skip Etsy posting)
  *   node run-daily.js --skip-notify        (skip Telegram messages)
@@ -69,8 +70,9 @@ async function runStep(label, fn) {
 
 async function main() {
   const date      = parseDateArg();
-  const skipDesign  = parseFlag('--skip-design');
-  const skipSheets  = parseFlag('--skip-sheets');
+  const skipDesign   = parseFlag('--skip-design');
+  const skipMockups  = parseFlag('--skip-mockups');
+  const skipSheets   = parseFlag('--skip-sheets');
   const skipListing = parseFlag('--skip-listing');
   const skipMetrics = parseFlag('--skip-metrics');
   const skipNotify  = parseFlag('--skip-notify');
@@ -119,7 +121,18 @@ async function main() {
       log.steps.design = { status: 'skipped' };
     }
 
-    // ── Step 4: Google Sheets ──────────────────────────────────────────────────
+    // ── Step 4: Mockup Generation (DALL-E 3) ──────────────────────────────────
+    if (!skipMockups) {
+      const mockupResult = await runStep('Mockup Generation (DALL-E 3)', () =>
+        step('mockup-generator').runMockupGenerator(date),
+      );
+      log.steps.mockups = { status: mockupResult.status, error: mockupResult.error };
+    } else {
+      console.log('[run-daily] Skipping mockup step (--skip-mockups)');
+      log.steps.mockups = { status: 'skipped' };
+    }
+
+    // ── Step 5: Google Sheets ──────────────────────────────────────────────────
     if (!skipSheets) {
       const sheetsResult = await runStep('Google Sheets (write product rows)', () =>
         step('google-sheets-writer').runGoogleSheetsWriter(date),
@@ -130,7 +143,7 @@ async function main() {
       log.steps.sheets = { status: 'skipped' };
     }
 
-    // ── Step 5: List on Etsy ──────────────────────────────────────────────────
+    // ── Step 6: List on Etsy ──────────────────────────────────────────────────
     if (!skipListing) {
       const listResult = await runStep('List (Etsy listings)', () =>
         step('etsy-lister').runLister(date),
@@ -149,7 +162,7 @@ async function main() {
     }
   }
 
-  // ── Step 6: Metrics ───────────────────────────────────────────────────────
+  // ── Step 7: Metrics ───────────────────────────────────────────────────────
   if (!skipMetrics) {
     const metricsResult = await runStep('Metrics (shop performance)', () =>
       step('metrics-tracker').runMetricsTracker(),
@@ -165,7 +178,7 @@ async function main() {
     log.steps.metrics = { status: 'skipped' };
   }
 
-  // ── Step 7: Notify ────────────────────────────────────────────────────────
+  // ── Step 8: Notify ────────────────────────────────────────────────────────
   if (!skipNotify) {
     const notifyResult = await runStep('Notify (Telegram)', () =>
       step('telegram-notifier').runNotifier(date),

@@ -160,7 +160,7 @@ async function uploadToDrive(token, imagePath, fileName) {
 // ─── Google Sheets: append row ────────────────────────────────────────────────
 
 async function appendSheetRow(token, rowData) {
-  const range = encodeURIComponent(`${SHEET_NAME}!A:L`);
+  const range = encodeURIComponent(`${SHEET_NAME}!A:O`);
   const url   = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
   const resp = await fetch(url, {
@@ -213,31 +213,45 @@ async function runGoogleSheetsWriter(date) {
         (d) => d.product_id === product.id && d.status === 'success',
       );
 
-      // Upload listing image to Drive if available
-      let imageUrl = '';
+      // Build list of image paths: [listing-image.png, mockup-1.png, mockup-2.png, mockup-3.png]
+      const imagePaths = [];
       if (design?.png_path && fs.existsSync(design.png_path)) {
-        const fileName = `etsy-product-${date}-${product.id}.png`;
-        imageUrl = await uploadToDrive(token, design.png_path, fileName);
-      } else {
-        console.log(`  [sheets-writer] No PNG found for product ${product.id} — image cell will be empty`);
+        imagePaths.push(design.png_path);
+      }
+      for (const mp of (design?.mockup_paths || [])) {
+        if (mp && fs.existsSync(mp)) imagePaths.push(mp);
+      }
+
+      // Upload all available images to Drive (up to 4)
+      const imageUrls = [];
+      for (let i = 0; i < Math.min(imagePaths.length, 4); i++) {
+        const fileName = `etsy-product-${date}-${product.id}-img${i + 1}.png`;
+        const url = await uploadToDrive(token, imagePaths[i], fileName); // eslint-disable-line no-await-in-loop
+        imageUrls.push(url);
+      }
+      // Pad to 4 columns
+      while (imageUrls.length < 4) imageUrls.push('');
+
+      if (imageUrls.every((u) => !u)) {
+        console.log(`  [sheets-writer] No images found for product ${product.id} — image cells will be empty`);
       }
 
       // Map tags to 8 columns, pad with empty strings if fewer than 8
       const tags = (product.tags || []).slice(0, 8);
       while (tags.length < 8) tags.push('');
 
-      // Row: title, description, price, tag1..tag8, Image
+      // Row: title, description, price, tag1..tag8, image1, image2, image3, image4
       const row = [
         product.title       || '',
         product.description || '',
         product.price_usd   || '',
         ...tags,
-        imageUrl,
+        ...imageUrls,
       ];
 
       await appendSheetRow(token, row);
-      console.log(`  [sheets-writer] ✅ Row added for: "${product.title}"`);
-      written.push({ product_id: product.id, title: product.title, image_url: imageUrl, status: 'success' });
+      console.log(`  [sheets-writer] ✅ Row added for: "${product.title}" (${imageUrls.filter(Boolean).length} images)`);
+      written.push({ product_id: product.id, title: product.title, image_urls: imageUrls.filter(Boolean), status: 'success' });
     } catch (err) {
       console.error(`  [sheets-writer] ❌ Failed for product ${product.id}: ${err.message}`);
       written.push({ product_id: product.id, status: 'failed', error: err.message });
@@ -263,7 +277,8 @@ if (require.main === module) {
       result.rows.forEach((r) => {
         const icon = r.status === 'success' ? '✅' : '❌';
         const img  = r.image_url ? ` → ${r.image_url}` : '';
-        console.log(`  ${icon} ${r.title || `Product ${r.product_id}`}${img}`);
+        const imgs = r.image_urls?.length ? ` (${r.image_urls.length} images)` : '';
+      console.log(`  ${icon} ${r.title || `Product ${r.product_id}`}${imgs}`);
       });
       process.exit(0);
     })
