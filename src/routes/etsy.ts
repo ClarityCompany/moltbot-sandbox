@@ -21,23 +21,19 @@ etsy.use('*', createAccessMiddleware({ type: 'html', redirectOnMissing: true }))
 
 // GET /etsy/status — Last run info
 etsy.get('/status', async (c) => {
-  const sandbox = c.get('sandbox');
-
   let lastRun: string | null = null;
   let lastRunStatus: string | null = null;
   let lastRunSteps: Record<string, string> = {};
 
+  // Read last-run.json directly from R2 (synced every 5 min) — no container needed
   let rawJson = '';
   try {
-    const proc = await sandbox.startProcess(
-      'cat /root/clawd/skills/etsy-automation/data/last-run.json 2>/dev/null || echo ""',
-    );
-    await waitForProcess(proc, 5000);
-    const logs = await proc.getLogs();
-    const raw = logs.stdout?.trim();
-    rawJson = raw || '';
-    if (raw) {
-      const run = JSON.parse(raw) as {
+    const obj = await c.env.MOLTBOT_BUCKET.get('skills/etsy-automation/data/last-run.json');
+    if (obj) {
+      rawJson = await obj.text();
+    }
+    if (rawJson) {
+      const run = JSON.parse(rawJson) as {
         timestamp?: string;
         started_at?: string;
         status?: string;
