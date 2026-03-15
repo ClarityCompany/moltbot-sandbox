@@ -48,6 +48,7 @@ function formatTimeAgo(ts: number) {
 export default function AdminPage() {
   const [pending, setPending] = useState<PendingDevice[]>([]);
   const [paired, setPaired] = useState<PairedDevice[]>([]);
+  const [devicesRaw, setDevicesRaw] = useState<{ stdout?: string; stderr?: string } | null>(null);
   const [storageStatus, setStorageStatus] = useState<StorageStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export default function AdminPage() {
       const data: DeviceListResponse = await listDevices();
       setPending(data.pending || []);
       setPaired(data.paired || []);
+      setDevicesRaw({ stdout: data.raw, stderr: data.stderr });
 
       if (data.error) {
         setError(data.error);
@@ -282,6 +284,23 @@ export default function AdminPage() {
                 <p className="hint">
                   Devices will appear here when they attempt to connect without being paired.
                 </p>
+                {devicesRaw && (devicesRaw.stdout || devicesRaw.stderr) && (
+                  <details style={{ marginTop: '12px', textAlign: 'left' }}>
+                    <summary style={{ cursor: 'pointer', color: '#888', fontSize: '0.85em' }}>
+                      Debug: openclaw devices list output
+                    </summary>
+                    {devicesRaw.stdout && (
+                      <pre style={{ background: '#111', color: '#ccc', padding: '8px', borderRadius: '4px', fontSize: '0.8em', overflowX: 'auto', marginTop: '8px' }}>
+                        {devicesRaw.stdout}
+                      </pre>
+                    )}
+                    {devicesRaw.stderr && (
+                      <pre style={{ background: '#111', color: '#f88', padding: '8px', borderRadius: '4px', fontSize: '0.8em', overflowX: 'auto', marginTop: '4px' }}>
+                        {devicesRaw.stderr}
+                      </pre>
+                    )}
+                  </details>
+                )}
               </div>
             ) : (
               <div className="devices-grid">
