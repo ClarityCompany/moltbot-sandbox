@@ -6,6 +6,7 @@ import {
   restartGateway,
   getStorageStatus,
   triggerSync,
+  runAutomation,
   AuthError,
   type PendingDevice,
   type PairedDevice,
@@ -55,6 +56,8 @@ export default function AdminPage() {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [restartInProgress, setRestartInProgress] = useState(false);
   const [syncInProgress, setSyncInProgress] = useState(false);
+  const [automationInProgress, setAutomationInProgress] = useState(false);
+  const [automationMessage, setAutomationMessage] = useState<string | null>(null);
 
   const fetchDevices = useCallback(async () => {
     try {
@@ -156,6 +159,19 @@ export default function AdminPage() {
     }
   };
 
+  const handleRunAutomation = async () => {
+    setAutomationInProgress(true);
+    setAutomationMessage(null);
+    try {
+      const result = await runAutomation();
+      setAutomationMessage(result.message || 'Automation started — check Telegram in ~2 minutes');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start automation');
+    } finally {
+      setAutomationInProgress(false);
+    }
+  };
+
   const handleSync = async () => {
     setSyncInProgress(true);
     try {
@@ -247,6 +263,27 @@ export default function AdminPage() {
           Restart the gateway to apply configuration changes or recover from errors. All connected
           clients will be temporarily disconnected.
         </p>
+      </section>
+
+      <section className="devices-section gateway-section">
+        <div className="section-header">
+          <h2>Etsy Automation</h2>
+          <button
+            className="btn btn-primary"
+            onClick={handleRunAutomation}
+            disabled={automationInProgress}
+          >
+            {automationInProgress && <ButtonSpinner />}
+            {automationInProgress ? 'Running...' : 'Run Automation'}
+          </button>
+        </div>
+        <p className="hint">
+          Manually trigger the daily Etsy automation workflow (research → design → notify).
+          Results will be sent to Telegram in ~2 minutes.
+        </p>
+        {automationMessage && (
+          <p style={{ color: '#4caf50', marginTop: '8px', fontSize: '0.9em' }}>{automationMessage}</p>
+        )}
       </section>
 
       {loading ? (

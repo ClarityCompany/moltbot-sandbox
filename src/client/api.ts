@@ -137,3 +137,15 @@ export async function triggerSync(): Promise<SyncResponse> {
     method: 'POST',
   });
 }
+
+export interface RunAutomationResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+export async function runAutomation(): Promise<RunAutomationResponse> {
+  return apiRequest<RunAutomationResponse>('/run-automation', {
+    method: 'POST',
+  });
+}
